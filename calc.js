@@ -1,5 +1,6 @@
 const n3 = require('n3');
 const fs = require('fs');
+const ss = require('simple-statistics');
 
 if (process.argv.length !== 4) {
     console.error('Usage: node calc.js INPUT OUTPUT');
@@ -62,18 +63,49 @@ filenames.forEach(file => {
     if (endedDay) {
         const graphs = dayToGraph[currentDay];
         delete dayToGraph[currentDay];
-        currentDay = undefined;
 
-        let currentMeasurements = [];
+        let currentMeasurements = {};
         let otherMeasurements = [];
         measurements.forEach(meas => {
             if (graphs.includes(meas.graph)) {
-                currentMeasurements.push(meas);
+                if (currentMeasurements[meas.subject] === undefined) {
+                    currentMeasurements[meas.subject] = [];
+                }
+                currentMeasurements[meas.subject].push(parseInt(n3.Util.getLiteralValue(meas.object)));
             } else {
                 otherMeasurements.push(meas);
             }
         });
         measurements = otherMeasurements;
-        console.log(currentMeasurements);
+
+
+
+        let writer = n3.Writer({prefixes: {stat: 'http://datapiloten.be/vocab/timeseries#'}});
+        Object.keys(currentMeasurements).forEach(parking => {
+            let data = currentMeasurements[parking];
+            let stats = {};
+            stats.mean = ss.mean(data);
+            stats.median = ss.median(data);
+            stats.firstQuartile = ss.quantile(data, 0.25);
+            stats.thirdQuartile = ss.quantile(data, 0.75);
+            stats.variance = ss.variance(data);
+            Object.keys(stats).forEach(key => {
+                let stat = stats[key];
+                writer.addTriple({
+                    'subject': parking,
+                    'predicate': 'stat:' + key,
+                    'object': n3.Util.createLiteral(stat)
+                });
+            });
+        });
+        writer.end((error, result) => {
+            // Write result to file// Build path
+            let path = out_dir;
+            if (path[path.length-1] !== '/') path += '/';
+            path += currentDay;
+            fs.writeFileSync(path, result);
+        });
+
+        currentDay = undefined;
     }
 });
