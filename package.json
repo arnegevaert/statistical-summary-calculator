@@ -1,0 +1,14 @@
+{
+  "name": "statistical-summary-calculator",
+  "version": "1.0.0",
+  "description": "Calculates statistical summary files per day for a given input directory",
+  "main": "calc.js",
+  "scripts": {
+    "test": "node calc.js test_in test_out"
+  },
+  "author": "Arne Gevaert <arnegevaert@gmail.com>",
+  "license": "ISC",
+  "dependencies": {
+    "n3": "^0.11.2"
+  }
+}
