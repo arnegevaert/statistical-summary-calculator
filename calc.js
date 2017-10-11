@@ -55,7 +55,7 @@ filenames.forEach(file => {
                 endedDay = true;
             }
             dayToGraph[day].push(triple.subject);
-            graphToGenTime[triple.graph] = triple.object;
+            graphToGenTime[triple.subject] = triple.object;
         } else if (triple.predicate === 'http://vocab.datex.org/terms#parkingNumberOfVacantSpaces') {
             measurements.push(triple);
         }
@@ -113,8 +113,8 @@ filenames.forEach(file => {
             writer.addTriple(subject, 'rdf:type', 'ts:Summary');
             writer.addTriple(subject, 'rdf:predicate', 'datex:numberOfVacantSpaces');
             writer.addTriple(subject, 'rdf:subject', parking);
-            writer.addTriple(subject, 'time:hasBeginning', n3.Util.createLiteral(beginning, 'http://www.w3.org/2001/XMLSchema#dateTime'));
-            writer.addTriple(subject, 'time:hasEnd', n3.Util.createLiteral(ending, 'http://www.w3.org/2001/XMLSchema#dateTime'));
+            writer.addTriple(subject, 'time:hasBeginning', n3.Util.createLiteral(beginning.format('YYYY-MM-DDThh:mm:ss'), 'http://www.w3.org/2001/XMLSchema#dateTime'));
+            writer.addTriple(subject, 'time:hasEnd', n3.Util.createLiteral(ending.format('YYYY-MM-DDThh:mm:ss'), 'http://www.w3.org/2001/XMLSchema#dateTime'));
 
             Object.keys(stats).forEach(key => {
                 let stat = stats[key];
