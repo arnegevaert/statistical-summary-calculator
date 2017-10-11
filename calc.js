@@ -1,6 +1,7 @@
 const n3 = require('n3');
 const fs = require('fs');
 const ss = require('simple-statistics');
+const moment = require('moment');
 
 if (process.argv.length !== 4) {
     console.error('Usage: node calc.js INPUT OUTPUT');
@@ -27,6 +28,7 @@ const filenames = fs.readdirSync(in_dir).sort();
 const parser = n3.Parser();
 
 let dayToGraph = {};
+let graphToGenTime = {};
 let measurements = [];
 let currentDay = undefined;
 filenames.forEach(file => {
@@ -53,6 +55,7 @@ filenames.forEach(file => {
                 endedDay = true;
             }
             dayToGraph[day].push(triple.subject);
+            graphToGenTime[triple.graph] = triple.object;
         } else if (triple.predicate === 'http://vocab.datex.org/terms#parkingNumberOfVacantSpaces') {
             measurements.push(triple);
         }
@@ -78,28 +81,49 @@ filenames.forEach(file => {
         });
         measurements = otherMeasurements;
 
+        let beginning, ending = undefined;
+        graphs.forEach(graph => {
+            let gentime = moment(n3.Util.getLiteralValue(graphToGenTime[graph]));
+            if (beginning === undefined || gentime < beginning) {
+                beginning = gentime;
+            }
+            if (ending === undefined || gentime > ending) {
+                ending = gentime;
+            }
+        });
 
-
-        let writer = n3.Writer({prefixes: {stat: 'http://datapiloten.be/vocab/timeseries#'}});
+        let prefixes = {
+            ts: 'http://datapiloten.be/vocab/timeseries#',
+            rdf: 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
+            time: 'https://www.w3.org/TR/owl-time/',
+            datex: 'http://vocab.datex.org/terms#'
+        };
+        let writer = n3.Writer({prefixes: prefixes});
+        let summIndex = 0;
         Object.keys(currentMeasurements).forEach(parking => {
             let data = currentMeasurements[parking];
+            let subject = '#summary' + summIndex;
             let stats = {};
             stats.mean = ss.mean(data);
             stats.median = ss.median(data);
             stats.firstQuartile = ss.quantile(data, 0.25);
             stats.thirdQuartile = ss.quantile(data, 0.75);
             stats.variance = ss.variance(data);
+
+            writer.addTriple(subject, 'rdf:type', 'ts:Summary');
+            writer.addTriple(subject, 'rdf:predicate', 'datex:numberOfVacantSpaces');
+            writer.addTriple(subject, 'rdf:subject', parking);
+            writer.addTriple(subject, 'time:hasBeginning', n3.Util.createLiteral(beginning, 'http://www.w3.org/2001/XMLSchema#dateTime'));
+            writer.addTriple(subject, 'time:hasEnd', n3.Util.createLiteral(ending, 'http://www.w3.org/2001/XMLSchema#dateTime'));
+
             Object.keys(stats).forEach(key => {
                 let stat = stats[key];
-                writer.addTriple({
-                    'subject': parking,
-                    'predicate': 'stat:' + key,
-                    'object': n3.Util.createLiteral(stat)
-                });
+                writer.addTriple(subject, 'ts:' + key, n3.Util.createLiteral(stat));
             });
+            summIndex++;
         });
+
         writer.end((error, result) => {
-            // Write result to file// Build path
             let path = out_dir;
             if (path[path.length-1] !== '/') path += '/';
             path += currentDay;
